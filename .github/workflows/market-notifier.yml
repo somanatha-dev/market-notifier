@@ -32,13 +32,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run notifier
-        # Uses explicit working directory to prevent "No such file or directory" errors
-        working-directory: ${{ github.workspace }}
+        working-directory: ./market-notifier
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python market_notifier.py
+          python market-notifier.py
+
 
       - name: Commit updated state if changed
         # GITHUB_TOKEN is automatically provided by GitHub Actions
