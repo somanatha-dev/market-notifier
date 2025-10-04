@@ -60,6 +60,8 @@ def now_ist():
 def fetch_market_data():
     """
     POC: Uses yfinance to fetch intraday Nifty close vs open for the day.
+    Replace this implementation with a better provider for production use:
+    - Sensex, Nifty, India VIX, FII/DII flows, top movers, news snippets.
     """
     try:
         ticker = yf.Ticker("^NSEI")  # common shorthand for NIFTY (may vary)
@@ -70,7 +72,7 @@ def fetch_market_data():
         last = float(hist['Close'].iloc[-1])
         pct = round((last - open_price) / open_price * 100, 2)
         return {
-            "nifty_pct": pct,           # <-- use calculated value
+            "nifty_pct": pct,
             "nifty_price": last,
             "time": now_ist().strftime("%Y-%m-%d %H:%M IST"),
             "vix": None,
@@ -84,6 +86,8 @@ def fetch_market_data():
 def compute_allocation(amount, vix):
     """
     Given total amount and current VIX (or None), returns a dict fund->amount (rupees).
+    Uses your rules: normally 25% each. If vix>VIX_THRESHOLD, reduce midcap to 10% and reallocate.
+    Rounding uses floor + put remainder in first fund to ensure sum == amount.
     """
     if vix is not None and vix > VIX_THRESHOLD:
         weights = [0.25, 0.325, 0.10, 0.325]
@@ -128,7 +132,8 @@ def format_eod(payload, state):
 
 def is_eod_run():
     """
-    Checks if current IST time matches 18:30 (±1 minute tolerance) for EOD.
+    The workflow runs at 18:30 IST via cron. We also check the local IST time to be safe.
+    Return True if current IST time matches 18:30 (±1 minute tolerance).
     """
     now = now_ist()
     return now.hour == 18 and now.minute in (30, 31)
@@ -140,7 +145,7 @@ def run_check():
         send_telegram(f"Market fetch error: {data.get('error')}")
         return state
 
-    # EOD check
+    # EOD: the workflow runs an EOD cron; this double-check ensures proper message too.
     if is_eod_run():
         send_telegram(format_eod(data, state))
         return state
@@ -150,7 +155,7 @@ def run_check():
         print("No nifty_pct available; skipping")
         return state
 
-    # Crash trigger logic
+    # Crash trigger
     if nifty_pct <= CRASH_TRIGGER_PCT:
         try:
             idx = state['deployed'].index(False)
