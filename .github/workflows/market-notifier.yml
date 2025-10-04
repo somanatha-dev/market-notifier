@@ -1,23 +1,35 @@
 name: Market Notifier
 
-# Controls when the workflow will run based on the India Standard Time (IST) market hours.
 on:
   schedule:
     - cron: '30 4 * * 1-5'   # 10:00 IST
     - cron: '30 6 * * 1-5'   # 12:00 IST
     - cron: '30 8 * * 1-5'   # 14:00 IST
-    - cron: '30 9 * * 1-5'   # 15:00 IST (Adjusted from 15:30 IST)
+    - cron: '30 9 * * 1-5'   # 15:00 IST
     - cron: '0 13 * * 1-5'   # 18:30 IST (EOD)
   workflow_dispatch:
 
 jobs:
   notify:
     runs-on: ubuntu-latest
+    # Put secrets in job env so all steps see them
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           persist-credentials: true
+
+      - name: Show repo tree (debug)
+        run: |
+          echo "PWD: $PWD"
+          echo "Repo root listing:"
+          ls -la
+          echo "Detailed listing including subfolders:"
+          find . -maxdepth 3 -type f -printf '%p\n' || ls -R
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -29,21 +41,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run notifier
-        # FIX: Explicitly set the working directory to find market-notifier.py
-        working-directory: ${{ github.workspace }} 
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - name: Run notifier (explicit path)
         run: |
-          python market_notifier.py # Note: Python filenames should match exactly (market_notifier.py, not market-notifier.py)
+          # Try both common filenames (dash and underscore) — run whichever exists.
+          if [ -f "./market-notifier.py" ]; then
+            echo "Running ./market-notifier.py"
+            python ./market-notifier.py
+          elif [ -f "./market_notifier.py" ]; then
+            echo "Running ./market_notifier.py"
+            python ./market_notifier.py
+          else
+            echo "ERROR: notifier script not found at repo root."
+            echo "Files at root:" && ls -la
+            exit 2
+          fi
 
       - name: Commit updated state if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add crash_state.json || true
-          
           if ! git diff --quiet --staged; then
             git commit -m "Update crash_state.json [ci skip]" || true
             git push origin HEAD
