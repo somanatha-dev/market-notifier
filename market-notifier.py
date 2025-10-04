@@ -72,8 +72,8 @@ def fetch_market_data():
         last = float(hist['Close'].iloc[-1])
         pct = round((last - open_price) / open_price * 100, 2)
         return {
-            "nifty_pct": -5.0,
-            "nifty_price": last,
+            "nifty_pct": pct,         # CORRECTED: Returns the percentage change
+            "nifty_price": last,      # CORRECTED: Returns the actual last price
             "time": now_ist().strftime("%Y-%m-%d %H:%M IST"),
             "vix": None,
             "fii": None,
