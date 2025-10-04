@@ -1,15 +1,14 @@
 name: Market Notifier
 
 # Controls when the workflow will run based on the India Standard Time (IST) market hours.
-# Note: GitHub cron times are in UTC.
 on:
   schedule:
-    - cron: '30 4 * * 1-5'   # 10:00 IST (UTC 4:30)
-    - cron: '30 6 * * 1-5'   # 12:00 IST (UTC 6:30)
-    - cron: '30 8 * * 1-5'   # 14:00 IST (UTC 8:30)
-    - cron: '30 9 * * 1-5'   # 15:00 IST (UTC 9:30) - Adjusted for market close checks
-    - cron: '0 13 * * 1-5'   # 18:30 IST (UTC 13:00) (EOD Summary)
-  workflow_dispatch:         # Allows you to run the workflow manually from the Actions tab
+    - cron: '30 4 * * 1-5'   # 10:00 IST
+    - cron: '30 6 * * 1-5'   # 12:00 IST
+    - cron: '30 8 * * 1-5'   # 14:00 IST
+    - cron: '30 9 * * 1-5'   # 15:00 IST (Adjusted from 15:30 IST)
+    - cron: '0 13 * * 1-5'   # 18:30 IST (EOD)
+  workflow_dispatch:
 
 jobs:
   notify:
@@ -18,7 +17,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          # Required for the 'git push' command later to commit the state file
           persist-credentials: true
 
       - name: Setup Python
@@ -32,30 +30,22 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run notifier
-        working-directory: ./market-notifier
+        # FIX: Explicitly set the working directory to find market-notifier.py
+        working-directory: ${{ github.workspace }} 
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python market-notifier.py
-
+          python market_notifier.py # Note: Python filenames should match exactly (market_notifier.py, not market-notifier.py)
 
       - name: Commit updated state if changed
-        # GITHUB_TOKEN is automatically provided by GitHub Actions
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Configure git author for the automatic commit
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Add the state file, ignoring errors if it doesn't exist yet
           git add crash_state.json || true
           
-          # Check if there are any changes staged (i.e., if crash_state.json was updated)
           if ! git diff --quiet --staged; then
-            # Commit and skip CI to prevent an infinite loop of new workflows
-            git commit -m "Update crash_state.json [ci skip]"
+            git commit -m "Update crash_state.json [ci skip]" || true
             git push origin HEAD
           else
             echo "No state changes"
