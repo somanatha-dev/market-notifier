@@ -34,7 +34,7 @@ VIX_THRESHOLD = 20.0
 STATE_FILE = "crash_state.json"
 IST = pytz.timezone("Asia/Kolkata")
 # threshold for crash trigger (percentage)
-CRASH_TRIGGER_PCT = -3.0
+CRASH_TRIGGER_PCT = -0.1  # Change from -3.0
 # ----------------------------
 
 # Secrets / env
